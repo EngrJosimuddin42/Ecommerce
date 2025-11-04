@@ -1,0 +1,5 @@
+package com.josim.ecommerce.ecommerce
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

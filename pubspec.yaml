@@ -1,0 +1,44 @@
+name: ecommerce
+description: Flutter e-commerce demo without payment
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=2.18.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+
+  # Firebase packages (compatible versions)
+  firebase_core: ^4.1.0
+  firebase_auth: ^6.1.1
+  cloud_firestore: ^6.0.3
+  firebase_storage: ^13.0.3
+  firebase_app_check: ^0.4.0
+
+  # Other packages
+  image_picker: ^1.2.0
+  get: ^4.6.5
+  google_fonts: ^6.0.0
+  dropdown_button2: ^2.3.9
+  flutter_rating_bar: ^4.0.0
+  pdf: ^3.11.2
+  printing: ^5.10.6
+  intl: ^0.18.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.14.4 # 🔹 added this line
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
