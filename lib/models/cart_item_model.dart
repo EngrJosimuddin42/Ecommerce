@@ -2,11 +2,11 @@ import 'package:ecommerce/models/product_model.dart';
 
 class CartItem {
   ProductModel product;
-  int qty;
+  int quantity;
 
-  CartItem({required this.product, required this.qty});
+  CartItem({required this.product, required this.quantity});
 
-  double get subtotal => product.price * qty;
+  double get subtotal => product.price * quantity;
 
   Map<String, dynamic> toMap() {
     return {
@@ -16,7 +16,7 @@ class CartItem {
       'imageUrl': product.imageUrl,
       'description': product.description,
       'category': product.category,
-      'qty': qty,
+      'quantity': quantity,
       'subtotal': subtotal,
     };
   }

@@ -8,6 +8,7 @@ import '../home/home_page.dart';
 import 'signup_page.dart';
 import '../../services/custom_snackbar.dart';
 import '../../views/auth/email_verify_page.dart';
+import '../../services/user_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -34,6 +35,9 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
+      final uid = userCredential.user?.uid;
+       await updateLastLogin(uid!);
+
       final User? user = userCredential.user;
 
       if (user == null) {

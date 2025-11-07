@@ -347,7 +347,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       ),
                       icon: const Icon(Icons.shopping_bag, color: Colors.white),
                       label: const Text("Buy Now", style: TextStyle(fontSize: 16, color: Colors.white)),
-                      onPressed: () {
+                      onPressed: () async{
                         try {
                           final cartController = Get.find<CartController>();
 
@@ -355,6 +355,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           final exists = cartController.cartItems.any((item) => item.product.id == widget.product.id);
                           if (!exists) {
                             cartController.addToCart(widget.product);
+                            await Future.delayed(const Duration(milliseconds: 1000));
                           }
 
                           // Navigate to checkout

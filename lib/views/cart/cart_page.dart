@@ -65,7 +65,7 @@ class CartPage extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(
-                        'Qty: ${cartItem.qty} | \$${cartItem.subtotal.toStringAsFixed(2)}',
+                        'Quantity: ${cartItem. quantity} | \$${cartItem.subtotal.toStringAsFixed(2)}',
                         style:
                         const TextStyle(color: Colors.green, fontSize: 13),
                       ),
@@ -75,7 +75,7 @@ class CartPage extends StatelessWidget {
                           IconButton(
                             icon: const Icon(Icons.remove),
                             onPressed: () =>
-                                cartController.decreaseQty(product),
+                                cartController.decreaseQuantity(product),
                           ),
                           IconButton(
                             icon: const Icon(Icons.add),

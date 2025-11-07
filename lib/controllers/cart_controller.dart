@@ -5,21 +5,37 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
-import 'package:ecommerce/services/custom_snackbar.dart';
+import '../services/custom_snackbar.dart';
 
 class CartController extends GetxController {
-  // Firebase instances
   FirebaseAuth get auth => FirebaseAuth.instance;
   FirebaseFirestore get firestore => FirebaseFirestore.instance;
 
-  // Reactive cart items
   var cartItems = <CartItem>[].obs;
   StreamSubscription<QuerySnapshot>? _cartSubscription;
+
+  /// ✅ এই flag টি cart update temporarily বন্ধ করতে ব্যবহৃত হবে
+  bool _pauseListening = false;
+
+  /// 🔹 Listening বন্ধ করা
+  void pauseListening() {
+    _pauseListening = true;
+  }
+
+  /// 🔹 Listening পুনরায় চালু করা
+  void resumeListening() {
+    _pauseListening = false;
+    _listenToCart(); // refresh
+  }
 
   @override
   void onInit() {
     super.onInit();
     _listenToCart();
+
+    auth.userChanges().listen((_) {
+      _listenToCart();
+    });
   }
 
   @override
@@ -28,10 +44,15 @@ class CartController extends GetxController {
     super.onClose();
   }
 
-  // Listen to realtime cart changes
+  /// 🔹 Firestore cart listener
   void _listenToCart() {
+    _cartSubscription?.cancel();
+
     final user = auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      cartItems.clear();
+      return;
+    }
 
     _cartSubscription = firestore
         .collection('carts')
@@ -39,6 +60,8 @@ class CartController extends GetxController {
         .collection('items')
         .snapshots()
         .listen((snapshot) {
+      if (_pauseListening) return; // ✅ listening বন্ধ থাকলে skip করবে
+
       cartItems.assignAll(snapshot.docs.map((doc) {
         final data = doc.data();
         return CartItem(
@@ -50,13 +73,13 @@ class CartController extends GetxController {
             description: data['description'] ?? '',
             category: data['category'] ?? '',
           ),
-          qty: data['qty'] ?? 1,
+          quantity: data['quantity'] ?? 1,
         );
       }).toList());
     });
   }
 
-  // Add product to cart
+  /// 🔹 Add product
   Future<void> addToCart(ProductModel product) async {
     final user = auth.currentUser;
     if (user == null) {
@@ -73,7 +96,7 @@ class CartController extends GetxController {
 
     final doc = await docRef.get();
     if (doc.exists) {
-      await docRef.update({'qty': FieldValue.increment(1)});
+      await docRef.update({'quantity': FieldValue.increment(1)});
     } else {
       await docRef.set({
         'title': product.title,
@@ -81,15 +104,12 @@ class CartController extends GetxController {
         'imageUrl': product.imageUrl,
         'description': product.description,
         'category': product.category,
-        'qty': 1,
+        'quantity': 1,
       });
     }
-
-    CustomSnackbar.show(Get.context!, '${product.title} added to cart!',
-        backgroundColor: Colors.green);
   }
 
-  // Remove product from cart
+  /// 🔹 Remove item
   Future<void> removeFromCart(ProductModel product) async {
     final user = auth.currentUser;
     if (user == null) return;
@@ -102,8 +122,8 @@ class CartController extends GetxController {
         .delete();
   }
 
-  // Decrease quantity
-  Future<void> decreaseQty(ProductModel product) async {
+  /// 🔹 Decrease quantity
+  Future<void> decreaseQuantity(ProductModel product) async {
     final user = auth.currentUser;
     if (user == null) return;
 
@@ -116,27 +136,30 @@ class CartController extends GetxController {
     final doc = await docRef.get();
     if (!doc.exists) return;
 
-    final qty = doc['qty'] ?? 1;
-    if (qty > 1) {
-      await docRef.update({'qty': FieldValue.increment(-1)});
+    final quantity = doc['quantity'] ?? 1;
+    if (quantity > 1) {
+      await docRef.update({'quantity': FieldValue.increment(-1)});
     } else {
       await docRef.delete();
     }
   }
 
-  // Total cart price
+  /// 🔹 Total cart value
   double get totalPrice =>
       cartItems.fold(0, (sum, item) => sum + item.subtotal);
 
-  // Clear entire cart
+  /// 🔹 Clear cart
   Future<void> clearCart() async {
     final user = auth.currentUser;
     if (user == null) return;
 
     final batch = firestore.batch();
-    final itemsRef =
-    await firestore.collection('carts').doc(user.uid).collection('items').get();
-    for (var doc in itemsRef.docs) {
+    final items = await firestore
+        .collection('carts')
+        .doc(user.uid)
+        .collection('items')
+        .get();
+    for (var doc in items.docs) {
       batch.delete(doc.reference);
     }
     await batch.commit();

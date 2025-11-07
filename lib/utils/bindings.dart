@@ -6,9 +6,9 @@ class AppBindings extends Bindings {
   @override
   void dependencies() {
     // AuthController app launch এ inject হবে
-    Get.lazyPut<AuthController>(() => AuthController());
+    Get.put<AuthController>(AuthController(), permanent: true);
 
-    // CartController app launch এ inject হবে
-    Get.lazyPut<CartController>(() => CartController());
+    // CartController app launch এ inject হবে এবং সব সময় জীবিত থাকবে 🧩
+    Get.put<CartController>(CartController(), permanent: true);
   }
 }

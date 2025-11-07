@@ -4,11 +4,13 @@ class OrderModel {
   final String id;
   final String userId;
   final double total;
-   String status;
-  final Map<String, dynamic>? shipping; // name, phone, address ইত্যাদি
+  String status;
+  final Map<String, dynamic>? shipping;
   final String? branch;
   final String? userEmail;
-  final Timestamp? createdAt; // Firestore Timestamp, nullable
+  final String? paymentMethod;
+  final List<Map<String, dynamic>>? items;
+  final Timestamp? createdAt;
 
   OrderModel({
     required this.id,
@@ -18,32 +20,38 @@ class OrderModel {
     this.shipping,
     this.branch,
     this.userEmail,
+    this.paymentMethod,
+    this.items,
     this.createdAt,
   });
 
   factory OrderModel.fromMap(Map<String, dynamic> map, String docId) {
-    // Guard against dynamic maps coming from Firestore
-    final shipping = (map['shipping'] is Map) ? Map<String, dynamic>.from(map['shipping']) : null;
+    final shipping = (map['shipping'] is Map)
+        ? Map<String, dynamic>.from(map['shipping'])
+        : null;
+
+    final items = (map['items'] is List)
+        ? List<Map<String, dynamic>>.from(map['items'])
+        : null;
+
     final branch = map['branch']?.toString();
     final userEmail = map['userEmail']?.toString();
+    final paymentMethod = map['paymentMethod']?.toString();
 
-    // createdAt could be Timestamp or DateTime or int (ms) — handle gracefully
+    // Handle createdAt
     Timestamp? ts;
     final rawCreated = map['createdAt'];
     if (rawCreated is Timestamp) {
       ts = rawCreated;
     } else if (rawCreated is Map && rawCreated.containsKey('_seconds')) {
-      // sometimes Firestore serializes timestamp as map with _seconds/_nanoseconds
-      final seconds = rawCreated['_seconds'] as int? ?? 0;
-      final nanoseconds = rawCreated['_nanoseconds'] as int? ?? 0;
-      ts = Timestamp(seconds, nanoseconds);
+      ts = Timestamp(
+        rawCreated['_seconds'] as int? ?? 0,
+        rawCreated['_nanoseconds'] as int? ?? 0,
+      );
     } else if (rawCreated is int) {
-      // milliseconds since epoch
       ts = Timestamp.fromMillisecondsSinceEpoch(rawCreated);
     } else if (rawCreated is DateTime) {
       ts = Timestamp.fromDate(rawCreated);
-    } else {
-      ts = null;
     }
 
     return OrderModel(
@@ -54,18 +62,23 @@ class OrderModel {
       shipping: shipping,
       branch: branch,
       userEmail: userEmail,
+      paymentMethod: paymentMethod,
+      items: items,
       createdAt: ts,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'userId': userId,
       'total': total,
       'status': status,
       if (shipping != null) 'shipping': shipping,
       if (branch != null) 'branch': branch,
       if (userEmail != null) 'userEmail': userEmail,
+      if (paymentMethod != null) 'paymentMethod': paymentMethod,
+      if (items != null) 'items': items,
       if (createdAt != null) 'createdAt': createdAt,
     };
   }

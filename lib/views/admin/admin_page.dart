@@ -13,7 +13,8 @@ import '../product/product_details_page.dart';
 import '../widgets/specification_section.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:ecommerce/views/order/orders_list_page.dart';
-import 'package:ecommerce/services/firebase_service.dart'; // FirebaseService class এর জন্য
+import 'package:ecommerce/services/firebase_service.dart';
+import '../cart/cart_page.dart';
 
 
 class AdminPage extends StatefulWidget {
@@ -280,6 +281,13 @@ class _AdminPageState extends State<AdminPage> {
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
           ),
           actions: [
+            if (!widget.isSuperAdmin)
+              IconButton(
+              icon: const Icon(Icons.shopping_cart, color: Colors.white),
+              onPressed: () {
+                Get.to(() => const CartPage());
+              },
+            ),
             IconButton(icon: const Icon(Icons.photo_library, color: Colors.white), onPressed: _pickAndUploadImage),
             if (!widget.fromSuperAdmin) ...[
               IconButton(

@@ -6,7 +6,7 @@ import '../../controllers/auth_controller.dart';
 import '../../utils/alert_dialog_utils.dart';
 import '../../services/custom_snackbar.dart';
 import '../../services/pdf_service.dart';
-
+import 'package:ecommerce/views/order/order_detail_page.dart';
 
 enum UserRole { user, admin, superAdmin }
 
@@ -30,6 +30,7 @@ class _OrdersListState extends State<OrdersListPage> {
   String searchQuery = '';
   List<String> branches = [];
   bool _loadingBranches = true;
+  final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
@@ -69,7 +70,7 @@ class _OrdersListState extends State<OrdersListPage> {
           : 'My Orders Report';
 
       // 🔹 Export PDF using PdfService
-      await PdfService.exportPdf(
+      await PdfService.exportOrdersListPdf(
         title: title,
         orders: orders,
       );
@@ -159,6 +160,7 @@ class _OrdersListState extends State<OrdersListPage> {
       statusFilter = 'All';
       dateRange = null;
       searchQuery = '';
+      searchController.clear();
     });
   }
 
@@ -251,232 +253,243 @@ class _OrdersListState extends State<OrdersListPage> {
     final q = _buildQuery();
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: Colors.blue.shade700,
-        title: Text(widget.role == UserRole.user ? 'My Orders' : widget.role == UserRole.admin ? 'All Orders' : 'All Orders'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () {
-              _loadBranches();
-              setState(() {});
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.clear_all, color: Colors.white),
-            tooltip: 'Clear filters',
-            onPressed: _clearFilters,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ----- Filters UI -----
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    // ---- Branch filter
-                    if (widget.role != UserRole.user)
-                      SizedBox(
-                        width: 180,
-                        child: _loadingBranches
-                            ? const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
-                            : DropdownButtonFormField<String>(
-                          value: branchFilter,
-                          decoration: InputDecoration(
-                            labelText: 'Branch',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('All Branches')),
-                            ...branches.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-                          ],
-                          onChanged: (val) => setState(() => branchFilter = val),
-                        ),
-                      ),
-                    // ---- Status filter
-                    if (widget.role == UserRole.admin || widget.role == UserRole.superAdmin) ...[
-                      SizedBox(
-                        width: 150,
-                        child: DropdownButtonFormField<String>(
-                          value: statusFilter,
-                          decoration: InputDecoration(
-                            labelText: 'Status',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                          items: ['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled']
-                              .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                              .toList(),
-                          onChanged: (val) => setState(() => statusFilter = val ?? 'All'),
-                        ),
-                      ),
-                      // --- Date Range Button ---
-                      SizedBox(
-                        width: 200,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                          onPressed: _pickDateRange,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.date_range),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  dateRange == null
-                                      ? 'Any Date'
-                                      : '${dateRange!.start.month}/${dateRange!.start.day}/${dateRange!.start.year} - ${dateRange!.end.month}/${dateRange!.end.day}/${dateRange!.end.year}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                // Search bar
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: widget.role == UserRole.user
-                        ? 'Search by order ID'
-                        : 'Search by order id, phone or name',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                  ),
-                  onChanged: (v) {
-                    // ✅ user হলে শুধু order ID search হবে
-                    if (widget.role == UserRole.user) {
-                      setState(() => searchQuery = v.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').trim());
-                    } else {
-                      setState(() => searchQuery = v.trim());
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          const Divider(height: 0),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: q.snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-
-                var orders = snapshot.data?.docs.map((d) {
-                  final map = d.data() as Map<String, dynamic>;
-                  return OrderModel.fromMap(map, d.id);
-                }).toList() ??
-                    [];
-
-                orders = _applyClientSearch(orders);
-
-                if (orders.isEmpty) return const Center(child: Text('No orders match filters/search'));
-
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    await _loadBranches();
-                    setState(() {});
-                  },
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemCount: orders.length,
-                    itemBuilder: (context, index) {
-                      final order = orders[index];
-                      final created = order.createdAt != null
-                          ? DateTime.fromMillisecondsSinceEpoch(order.createdAt!.millisecondsSinceEpoch)
-                          : null;
-
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(12),
-                          title: Row(
-                            children: [
-                              Expanded(child: Text('Order #${order.id}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(order.status).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(order.status, style: TextStyle(color: _statusColor(order.status), fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 6),
-                              Text('Total: ৳${order.total.toStringAsFixed(2)}'),
-                              if (order.shipping?['name'] != null && order.shipping!['name']!.isNotEmpty)
-                                Text('Customer: ${order.shipping!['name']}'),
-                              if (order.shipping?['phone'] != null && order.shipping!['phone']!.isNotEmpty)
-                                Text('Phone: ${order.shipping!['phone']}'),
-                              if (order.branch != null && order.branch!.isNotEmpty) Text('Branch: ${order.branch}'),
-                              if (created != null)
-                                Text('Date: ${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')}'),
-                            ],
-                          ),
-                          trailing: widget.role == UserRole.user
-                              ? IconButton(
-                            icon: const Icon(Icons.visibility, color: Colors.indigo),
-                            onPressed: () => _showUserOrderDialog(order),
-                          )
-                              : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.green),
-                                onPressed: () => _updateStatus(order),
-                              ),
-                              if (widget.role == UserRole.superAdmin)
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _deleteOrder(order.id),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                );
+        backgroundColor: Colors.grey.shade100,
+        appBar: AppBar(
+          backgroundColor: Colors.blue.shade700,
+          title: Text(widget.role == UserRole.user ? 'My Orders' : widget.role == UserRole.admin ? 'All Orders' : 'All Orders'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: () {
+                _loadBranches();
+                setState(() {});
               },
             ),
-          ),
-        ],
-      ),
+            IconButton(
+              icon: const Icon(Icons.clear, color: Colors.white),
+              tooltip: 'Clear filters',
+              onPressed: _clearFilters,
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            // ----- Filters UI -----
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      // ---- Branch filter
+                      if (widget.role != UserRole.user)
+                        SizedBox(
+                          width: 180,
+                          child: _loadingBranches
+                              ? const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                              : DropdownButtonFormField<String>(
+                            value: branchFilter,
+                            decoration: InputDecoration(
+                              labelText: 'Branch',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('All Branches')),
+                              ...branches.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+                            ],
+                            onChanged: (val) => setState(() => branchFilter = val),
+                          ),
+                        ),
+                      // ---- Status filter
+                      if (widget.role == UserRole.admin || widget.role == UserRole.superAdmin) ...[
+                        SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: statusFilter,
+                            decoration: InputDecoration(
+                              labelText: 'Status',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                            items: ['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled']
+                                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                .toList(),
+                            onChanged: (val) => setState(() => statusFilter = val ?? 'All'),
+                          ),
+                        ),
+                        // --- Date Range Button ---
+                        SizedBox(
+                          width: 200,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                            onPressed: _pickDateRange,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.date_range),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    dateRange == null
+                                        ? 'Any Date'
+                                        : '${dateRange!.start.month}/${dateRange!.start.day}/${dateRange!.start.year} - ${dateRange!.end.month}/${dateRange!.end.day}/${dateRange!.end.year}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Search bar
+                  TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      hintText: widget.role == UserRole.user
+                          ? 'Search by order ID'
+                          : 'Search by order id, phone or name',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    ),
+                    onChanged: (v) {
+                      // ✅ user হলে শুধু order ID search হবে
+                      if (widget.role == UserRole.user) {
+                        setState(() => searchQuery = v.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').trim());
+                      } else {
+                        setState(() => searchQuery = v.trim());
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 0),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: q.snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+
+                  var orders = snapshot.data?.docs.map((d) {
+                    final map = d.data() as Map<String, dynamic>;
+                    return OrderModel.fromMap(map, d.id);
+                  }).toList() ??
+                      [];
+
+                  orders = _applyClientSearch(orders);
+
+                  if (orders.isEmpty) return const Center(child: Text('No orders match filters/search'));
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      await _loadBranches();
+                      setState(() {});
+                    },
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemCount: orders.length,
+                      itemBuilder: (context, index) {
+                        final order = orders[index];
+                        final created = order.createdAt != null
+                            ? DateTime.fromMillisecondsSinceEpoch(order.createdAt!.millisecondsSinceEpoch)
+                            : null;
+
+                        return Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(12),
+                            title: Row(
+                              children: [
+                                Expanded(child: Text('Order #${order.id}', style: const TextStyle(fontWeight: FontWeight.bold))),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(order.status).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(order.status, style: TextStyle(color: _statusColor(order.status), fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 6),
+                                Text('Total: ৳${order.total.toStringAsFixed(2)}'),
+                                if (order.shipping?['name'] != null && order.shipping!['name']!.isNotEmpty)
+                                  Text('Customer: ${order.shipping!['name']}'),
+                                if (order.shipping?['phone'] != null && order.shipping!['phone']!.isNotEmpty)
+                                  Text('Phone: ${order.shipping!['phone']}'),
+                                if (order.branch != null && order.branch!.isNotEmpty) Text('Branch: ${order.branch}'),
+                                if (order.toMap().containsKey('paymentMethod'))
+                                  Text('Payment: ${order.toMap()['paymentMethod']}'),
+                                if (created != null)
+                                  Text('Date: ${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')}'),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => OrderDetailPage(order: order),
+                                ),
+                              );
+                            },
+                            trailing: widget.role == UserRole.user
+                                ? IconButton(
+                              icon: const Icon(Icons.visibility, color: Colors.indigo),
+                              onPressed: () => _showUserOrderDialog(order),
+                            )
+                                : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.green),
+                                  onPressed: () => _updateStatus(order),
+                                ),
+                                if (widget.role == UserRole.superAdmin)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _deleteOrder(order.id),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
 
         // 🔹 Floating button for PDF export
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: Colors.blue.shade700,
-          icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-          label: const Text("Export PDF", style: TextStyle(color: Colors.white)),
-          onPressed: _exportOrdersToPdf)
+            backgroundColor: Colors.blue.shade700,
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+            label: const Text("Export PDF", style: TextStyle(color: Colors.white)),
+            onPressed: _exportOrdersToPdf)
     );
   }
 

@@ -7,6 +7,7 @@ import '../../services/custom_snackbar.dart';
 import 'admin_page.dart';
 import '../../utils/alert_dialog_utils.dart';
 import 'package:ecommerce/views/order/orders_list_page.dart';
+import '../cart/cart_page.dart';
 
 class SuperAdminPage extends StatefulWidget {
   const SuperAdminPage({super.key});
@@ -124,6 +125,12 @@ class _SuperAdminPageState extends State<SuperAdminPage> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.shopping_cart, color: Colors.white),
+            onPressed: () {
+              Get.to(() => const CartPage());
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.list_alt, color: Colors.white),
             tooltip: 'View Orders',
