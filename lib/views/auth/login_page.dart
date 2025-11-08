@@ -9,6 +9,7 @@ import 'signup_page.dart';
 import '../../services/custom_snackbar.dart';
 import '../../views/auth/email_verify_page.dart';
 import '../../services/user_service.dart';
+import 'package:ecommerce/services/password_reset_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -210,7 +211,22 @@ class _LoginPageState extends State<LoginPage> {
                       validator: (value) =>
                       value!.isEmpty ? 'Enter your password' : null,
                     ),
-                    const SizedBox(height: 16),
+                    // Forgot Password
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          PasswordResetDialog.show(context);
+                        },
+                        child: const Text(
+                          "Forgot Password?",
+                          style: TextStyle(
+                              color: Colors.deepPurple,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
